@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Live News Ticker</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Bebas+Neue&family=IBM+Plex+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0a;
+    --panel: #111111;
+    --border: #222;
+    --ap-color: #e8d5a3;
+    --ap-accent: #c9a84c;
+    --aj-color: #a3c4e8;
+    --aj-accent: #4c8ec9;
+    --muted: #555;
+    --text: #ddd;
+    --bright: #fff;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'IBM Plex Sans', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+
+  .container {
+    width: 100%;
+    max-width: 1100px;
+  }
+
+  .masthead {
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
+    margin-bottom: 24px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 12px;
+  }
+
+  .masthead h1 {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 2.8rem;
+    letter-spacing: 4px;
+    color: var(--bright);
+  }
+
+  .live-dot {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.7rem;
+    color: #e55;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+
+  .live-dot::before {
+    content: '';
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    background: #e55;
+    border-radius: 50%;
+    animation: pulse 1.4s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(0.8); }
+  }
+
+  .timestamp {
+    margin-left: auto;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.72rem;
+    color: var(--muted);
+    letter-spacing: 1px;
+  }
+
+  /* TICKER TRACK */
+  .ticker-wrapper {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    overflow: hidden;
+    position: relative;
+    height: 52px;
+    margin-bottom: 16px;
+  }
+
+  .ticker-wrapper::before, .ticker-wrapper::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 60px;
+    z-index: 10;
+    pointer-events: none;
+  }
+  .ticker-wrapper::before { left: 0; background: linear-gradient(to right, var(--panel), transparent); }
+  .ticker-wrapper::after { right: 0; background: linear-gradient(to left, var(--panel), transparent); }
+
+  .ticker-track {
+    display: flex;
+    align-items: center;
+    height: 100%;
+    white-space: nowrap;
+    animation: scroll linear infinite;
+    animation-duration: var(--scroll-duration, 90s);
+  }
+
+  .ticker-track:hover { animation-play-state: paused; }
+
+  @keyframes scroll {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
+  }
+
+  .ticker-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    padding: 0 36px;
+    height: 100%;
+    border-right: 1px solid var(--border);
+    cursor: default;
+    transition: background 0.2s;
+  }
+
+  .ticker-item:hover { background: rgba(255,255,255,0.03); }
+
+  .source-badge {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.6rem;
+    font-weight: 600;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding: 2px 6px;
+    border: 1px solid;
+    flex-shrink: 0;
+  }
+
+  .source-badge.ap {
+    color: var(--ap-accent);
+    border-color: var(--ap-accent);
+  }
+  .source-badge.aj {
+    color: var(--aj-accent);
+    border-color: var(--aj-accent);
+  }
+
+  .headline-text {
+    font-size: 0.88rem;
+    font-weight: 400;
+    color: var(--text);
+    letter-spacing: 0.3px;
+  }
+
+  /* HEADLINES PANEL */
+  .panels {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+
+  .feed-panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+  }
+
+  .feed-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .feed-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.1rem;
+    letter-spacing: 3px;
+  }
+
+  .feed-title.ap { color: var(--ap-color); }
+  .feed-title.aj { color: var(--aj-color); }
+
+  .feed-count {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.65rem;
+    color: var(--muted);
+    letter-spacing: 1px;
+  }
+
+  .feed-items {
+    flex: 1;
+    overflow-y: auto;
+    max-height: 360px;
+    padding: 8px 0;
+  }
+
+  .feed-items::-webkit-scrollbar { width: 3px; }
+  .feed-items::-webkit-scrollbar-track { background: transparent; }
+  .feed-items::-webkit-scrollbar-thumb { background: var(--border); }
+
+  .feed-item {
+    padding: 12px 16px;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    cursor: default;
+    transition: background 0.15s;
+  }
+
+  .feed-item:hover { background: rgba(255,255,255,0.03); }
+  .feed-item:last-child { border-bottom: none; }
+
+  .item-time {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.62rem;
+    color: var(--muted);
+    letter-spacing: 1px;
+    margin-bottom: 4px;
+  }
+
+  .item-headline {
+    font-size: 0.82rem;
+    line-height: 1.45;
+    color: var(--text);
+  }
+
+  .item-headline a {
+    color: inherit;
+    text-decoration: none;
+  }
+  .item-headline a:hover { text-decoration: underline; color: var(--bright); }
+
+  /* STATUS */
+  .status-bar {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.62rem;
+    color: var(--muted);
+    letter-spacing: 1px;
+  }
+
+  .status-ok { color: #4c9; }
+  .status-err { color: #e55; }
+
+  .refresh-btn {
+    margin-left: auto;
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.62rem;
+    letter-spacing: 1px;
+    padding: 4px 10px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .refresh-btn:hover { border-color: var(--text); color: var(--text); }
+
+  .skeleton {
+    background: linear-gradient(90deg, var(--border) 25%, #2a2a2a 50%, var(--border) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.4s infinite;
+    border-radius: 2px;
+    height: 12px;
+    margin-bottom: 6px;
+  }
+  .skeleton.wide { width: 85%; }
+  .skeleton.short { width: 45%; }
+
+  @keyframes shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+
+  .no-news {
+    padding: 24px 16px;
+    color: var(--muted);
+    font-size: 0.8rem;
+    font-family: 'IBM Plex Mono', monospace;
+    text-align: center;
+  }
+
+  @media (max-width: 680px) {
+    .panels { grid-template-columns: 1fr; }
+    .masthead h1 { font-size: 2rem; }
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <div class="masthead">
+    <h1>WIRE</h1>
+    <span class="live-dot">Live</span>
+    <span class="timestamp" id="clock">--:--:--</span>
+  </div>
+
+  <div class="ticker-wrapper">
+    <div class="ticker-track" id="tickerTrack">
+      <span style="padding: 0 40px; font-family: 'IBM Plex Mono', monospace; font-size: 0.75rem; color: var(--muted);">Loading headlines...</span>
+    </div>
+  </div>
+
+  <div class="panels">
+    <div class="feed-panel">
+      <div class="feed-header">
+        <span class="feed-title ap">Associated Press</span>
+        <span class="feed-count" id="apCount">— items</span>
+      </div>
+      <div class="feed-items" id="apFeed">
+        <div class="feed-item">
+          <div class="skeleton wide"></div>
+          <div class="skeleton short"></div>
+        </div>
+        <div class="feed-item">
+          <div class="skeleton wide"></div>
+          <div class="skeleton short"></div>
+        </div>
+        <div class="feed-item">
+          <div class="skeleton wide"></div>
+          <div class="skeleton short"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="feed-panel">
+      <div class="feed-header">
+        <span class="feed-title aj">Al Jazeera</span>
+        <span class="feed-count" id="ajCount">— items</span>
+      </div>
+      <div class="feed-items" id="ajFeed">
+        <div class="feed-item">
+          <div class="skeleton wide"></div>
+          <div class="skeleton short"></div>
+        </div>
+        <div class="feed-item">
+          <div class="skeleton wide"></div>
+          <div class="skeleton short"></div>
+        </div>
+        <div class="feed-item">
+          <div class="skeleton wide"></div>
+          <div class="skeleton short"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="status-bar">
+    <span id="statusMsg">Fetching feeds...</span>
+    <span id="lastUpdated"></span>
+    <button class="refresh-btn" onclick="loadAll()">↻ REFRESH</button>
+  </div>
+</div>
+
+<script>
+// Clock
+function updateClock() {
+  const now = new Date();
+  document.getElementById('clock').textContent =
+    now.toLocaleTimeString('en-US', { hour12: false, hour:'2-digit', minute:'2-digit', second:'2-digit' })
+    + ' UTC' + (now.getTimezoneOffset() > 0 ? '-' : '+')
+    + String(Math.abs(now.getTimezoneOffset() / 60)).padStart(2, '0');
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// RSS sources via rss2json proxy (no auth needed, public CORS proxy)
+const SOURCES = [
+  {
+    id: 'ap',
+    name: 'AP',
+    url: 'https://rsshub.app/apnews/topics/apf-topnews',
+    fallback: 'https://feeds.apnews.com/rss/topnews',
+  },
+  {
+    id: 'aj',
+    name: 'AJ',
+    url: 'https://www.aljazeera.com/xml/rss/all.xml',
+  }
+];
+
+const CORS_PROXY = 'https://api.rss2json.com/v1/api.json?rss_url=';
+
+let allHeadlines = { ap: [], aj: [] };
+
+async function fetchFeed(source) {
+  const urls = [source.url];
+  if (source.fallback) urls.push(source.fallback);
+
+  for (const feedUrl of urls) {
+    try {
+      const res = await fetch(CORS_PROXY + encodeURIComponent(feedUrl), { signal: AbortSignal.timeout(8000) });
+      const data = await res.json();
+      if (data.status === 'ok' && data.items && data.items.length > 0) {
+        return data.items.slice(0, 20).map(item => ({
+          title: item.title,
+          link: item.link,
+          pubDate: item.pubDate || item.published || null,
+        }));
+      }
+    } catch (e) {
+      // try next
+    }
+  }
+  return null;
+}
+
+function formatTime(dateStr) {
+  if (!dateStr) return '';
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d)) return '';
+    return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+  } catch { return ''; }
+}
+
+function renderFeed(feedId, items, countId) {
+  const el = document.getElementById(feedId);
+  const cnt = document.getElementById(countId);
+
+  if (!items || items.length === 0) {
+    el.innerHTML = '<div class="no-news">Unable to load feed</div>';
+    cnt.textContent = '0 items';
+    return;
+  }
+
+  cnt.textContent = `${items.length} items`;
+  el.innerHTML = items.map(item => `
+    <div class="feed-item">
+      ${item.pubDate ? `<div class="item-time">${formatTime(item.pubDate)}</div>` : ''}
+      <div class="item-headline">
+        ${item.link ? `<a href="${item.link}" target="_blank" rel="noopener">${item.title}</a>` : item.title}
+      </div>
+    </div>
+  `).join('');
+}
+
+function buildTicker() {
+  const ap = allHeadlines.ap || [];
+  const aj = allHeadlines.aj || [];
+
+  if (ap.length === 0 && aj.length === 0) return;
+
+  // Interleave: ap, aj, ap, aj...
+  const mixed = [];
+  const max = Math.max(ap.length, aj.length);
+  for (let i = 0; i < max; i++) {
+    if (i < ap.length) mixed.push({ source: 'AP', cls: 'ap', ...ap[i] });
+    if (i < aj.length) mixed.push({ source: 'AJ', cls: 'aj', ...aj[i] });
+  }
+
+  const itemsHTML = mixed.map(h => `
+    <div class="ticker-item">
+      <span class="source-badge ${h.cls}">${h.source}</span>
+      <span class="headline-text">${h.title}</span>
+    </div>
+  `).join('');
+
+  // Duplicate for seamless loop
+  const track = document.getElementById('tickerTrack');
+  track.innerHTML = itemsHTML + itemsHTML;
+
+  // Adjust speed based on content length
+  const totalChars = mixed.reduce((s, h) => s + h.title.length, 0);
+  const duration = Math.max(60, Math.min(180, totalChars * 0.18));
+  track.style.setProperty('--scroll-duration', `${duration}s`);
+  track.style.animationDuration = `${duration}s`;
+}
+
+async function loadAll() {
+  const statusEl = document.getElementById('statusMsg');
+  const lastEl = document.getElementById('lastUpdated');
+  statusEl.textContent = 'Fetching feeds...';
+  statusEl.className = '';
+
+  const [apItems, ajItems] = await Promise.all([
+    fetchFeed(SOURCES[0]),
+    fetchFeed(SOURCES[1])
+  ]);
+
+  allHeadlines.ap = apItems || [];
+  allHeadlines.aj = ajItems || [];
+
+  renderFeed('apFeed', apItems, 'apCount');
+  renderFeed('ajFeed', ajItems, 'ajCount');
+  buildTicker();
+
+  const ok = (apItems && apItems.length > 0) || (ajItems && ajItems.length > 0);
+  statusEl.className = ok ? 'status-ok' : 'status-err';
+  statusEl.textContent = ok ? '● FEEDS ACTIVE' : '● FEED ERROR — USING FALLBACK';
+  lastEl.textContent = `Last updated: ${new Date().toLocaleTimeString()}`;
+}
+
+// Auto-refresh every 5 minutes
+loadAll();
+setInterval(loadAll, 5 * 60 * 1000);
+</script>
+</body>
+</html>
